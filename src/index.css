@@ -59,3 +59,18 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Full-height root so h-screen sections behave on mobile */
+html, body, #root { height: 100%; background: #000; }
+
+/* Optional: visually hide scrollbar in the feed (still scrollable) */
+.tiktok-feed::-webkit-scrollbar { width: 0; height: 0; }
+.tiktok-feed { scrollbar-width: none; }
+
+/* Crisp text & tap feel */
+* { -webkit-tap-highlight-color: transparent; }
+
