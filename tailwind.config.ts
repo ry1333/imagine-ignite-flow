@@ -47,15 +47,29 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+      },
+      backgroundImage: {
+        'gradient-primary': 'linear-gradient(135deg, hsl(var(--gradient-cyan)), hsl(var(--gradient-magenta)))',
+        'gradient-secondary': 'linear-gradient(135deg, hsl(var(--gradient-blue)), hsl(var(--gradient-purple)))',
+        'gradient-radial': 'radial-gradient(circle, hsl(var(--gradient-cyan) / 0.2), transparent 70%)',
+      },
+      boxShadow: {
+        'glow-cyan': '0 0 20px hsl(var(--glow-cyan) / 0.3), 0 0 40px hsl(var(--glow-cyan) / 0.1)',
+        'glow-magenta': '0 0 20px hsl(var(--glow-magenta) / 0.3), 0 0 40px hsl(var(--glow-magenta) / 0.1)',
+        'glow-primary': '0 0 30px hsl(var(--primary) / 0.4)',
+      },
+      animation: {
+        'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        'float': 'float 3s ease-in-out infinite',
+      },
+      keyframes: {
+        'pulse-glow': {
+          '0%, 100%': { boxShadow: '0 0 20px hsl(var(--glow-cyan) / 0.3)' },
+          '50%': { boxShadow: '0 0 30px hsl(var(--glow-cyan) / 0.6), 0 0 50px hsl(var(--glow-magenta) / 0.3)' },
+        },
+        'float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
         },
       },
       borderRadius: {
