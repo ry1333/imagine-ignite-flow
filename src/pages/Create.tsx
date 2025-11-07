@@ -14,8 +14,20 @@ export default function Create() {
           Remixing post #{remix}
         </div>
       )}
+<<<<<<< HEAD
       <p className="opacity-70">Creation moved to the new DJ screen.</p>
       <button onClick={() => nav('/dj')} className="rounded-xl border px-4 py-2">Open DJ</button>
+=======
+      <p className="opacity-70">
+        We’ve moved creation to the new DJ screen. Use that for mixing and posting.
+      </p>
+      <button
+        onClick={() => nav('/dj')}
+        className="rounded-xl border px-4 py-2"
+      >
+        Open DJ
+      </button>
+>>>>>>> 8750569 (wip)
     </div>
   )
 }
