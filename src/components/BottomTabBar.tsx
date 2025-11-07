@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { House, Wand2, BookOpen, User } from 'lucide-react'
 
 const tabs = [
-  { to: '/listen', label: 'Listen', Icon: House },
+  { to: '/stream', label: 'Listen', Icon: House },
   { to: '/create', label: 'Create', Icon: Wand2 },
   { to: '/learn',  label: 'Learn',  Icon: BookOpen },
   { to: '/profile',label: 'Profile',Icon: User },
