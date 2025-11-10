@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { hasSupabase } from '../lib/env'
 import { getCurrentUserProfile } from '../lib/supabase/profiles'
