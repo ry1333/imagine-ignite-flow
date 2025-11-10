@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ActionRail from '../components/ActionRail'
 import { useSnapAutoplay } from '../hooks/useSnapAutoplay'
 
@@ -10,6 +10,7 @@ const posts = [
 ]
 
 export default function Listen() {
+  const nav = useNavigate()
   const feedRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!feedRef.current) return
@@ -48,7 +49,7 @@ export default function Listen() {
             </div>
           </div>
 
-          <ActionRail onRemix={() => { /* navigate to Create with slug later */ }} />
+          <ActionRail onRemix={() => nav(`/dj?remix=${p.id}`)} />
         </section>
       ))}
     </div>

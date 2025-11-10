@@ -129,6 +129,9 @@ export class Mixer {
   master: GainNode
   deckA: Deck
   deckB: Deck
+  private mediaRecorder: MediaRecorder | null = null
+  private recordedChunks: Blob[] = []
+  private recordingDestination: MediaStreamAudioDestinationNode | null = null
 
   constructor() {
     // @ts-ignore - Safari prefix
@@ -144,5 +147,74 @@ export class Mixer {
   setCrossfade(x: number) {
     this.deckA.gain.gain.value = equalPower(x)
     this.deckB.gain.gain.value = equalPower(1 - x)
+  }
+
+  /**
+   * Start recording the mixer output
+   */
+  startRecording() {
+    if (this.mediaRecorder) {
+      throw new Error('Already recording')
+    }
+
+    // Create a destination for recording
+    this.recordingDestination = this.ctx.createMediaStreamDestination()
+    this.master.connect(this.recordingDestination)
+
+    // Set up MediaRecorder with the stream
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm'
+
+    this.mediaRecorder = new MediaRecorder(this.recordingDestination.stream, { mimeType })
+    this.recordedChunks = []
+
+    this.mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        this.recordedChunks.push(event.data)
+      }
+    }
+
+    this.mediaRecorder.start(100) // Collect data every 100ms
+  }
+
+  /**
+   * Stop recording and return the recorded audio as a Blob
+   */
+  async stopRecording(): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      if (!this.mediaRecorder) {
+        reject(new Error('Not recording'))
+        return
+      }
+
+      this.mediaRecorder.onstop = () => {
+        const mimeType = this.mediaRecorder?.mimeType || 'audio/webm'
+        const blob = new Blob(this.recordedChunks, { type: mimeType })
+
+        // Cleanup
+        if (this.recordingDestination) {
+          this.master.disconnect(this.recordingDestination)
+          this.recordingDestination = null
+        }
+        this.mediaRecorder = null
+        this.recordedChunks = []
+
+        resolve(blob)
+      }
+
+      this.mediaRecorder.onerror = (event) => {
+        reject(new Error('Recording failed: ' + event))
+      }
+
+      this.mediaRecorder.stop()
+    })
+  }
+
+  /**
+   * Check if currently recording
+   */
+  get isRecording(): boolean {
+    return this.mediaRecorder?.state === 'recording'
   }
 }

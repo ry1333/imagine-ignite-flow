@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Mixer } from '../lib/audio/mixer'
 import Turntable from '../components/Turntable'
 import CustomSlider from '../components/CustomSlider'
-import { Link, useNavigate } from 'react-router-dom'
-import { createPost } from '../lib/supabase/posts'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { createPost, getPost } from '../lib/supabase/posts'
+import { uploadAudio } from '../lib/supabase/storage'
 import { toast } from 'sonner'
 
 export default function DJ() {
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const mixer = useMemo(() => new Mixer(), [])
   const [aProg, setAProg] = useState(0)
   const [bProg, setBProg] = useState(0)
@@ -17,6 +19,10 @@ export default function DJ() {
   const [bBpm, setBBpm] = useState(124)
   const [masterVol, setMasterVol] = useState(0.8)
   const [isRecording, setIsRecording] = useState(false)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [caption, setCaption] = useState('')
+  const [isPublishing, setIsPublishing] = useState(false)
 
   useEffect(() => {
     const tick = () => {
@@ -33,6 +39,31 @@ export default function DJ() {
   useEffect(() => { mixer.setCrossfade(xf) }, [xf, mixer])
   useEffect(() => { mixer.master.gain.value = masterVol }, [masterVol, mixer])
 
+  // Load remix track if remix parameter is present
+  useEffect(() => {
+    const remixId = searchParams.get('remix')
+    if (!remixId) return
+
+    async function loadRemixTrack() {
+      try {
+        toast.info('Loading track to remix...')
+        const post = await getPost(remixId!)
+        if (post && post.audio_url) {
+          await mixer.deckA.loadFromUrl(post.audio_url)
+          if (post.bpm) setABpm(post.bpm)
+          toast.success(`Loaded "${post.style || 'track'}" to Deck A`)
+        } else {
+          toast.error('Could not load remix track')
+        }
+      } catch (error) {
+        console.error('Error loading remix track:', error)
+        toast.error('Failed to load track')
+      }
+    }
+
+    loadRemixTrack()
+  }, [searchParams, mixer])
+
   function syncBtoA() {
     if (!mixer.deckA.buffer || !mixer.deckB.buffer) return
     const ratio = bBpm / aBpm
@@ -40,26 +71,66 @@ export default function DJ() {
     toast.success('Decks synced!')
   }
 
-  async function handlePublish() {
-    setIsRecording(true)
-    toast.info('Recording not yet implemented - will capture and upload mix')
+  async function handleRecord() {
+    if (isRecording) {
+      // Stop recording
+      try {
+        const blob = await mixer.stopRecording()
+        setRecordedBlob(blob)
+        setIsRecording(false)
+        setShowPublishModal(true)
+        toast.success('Recording stopped')
+      } catch (error) {
+        console.error('Error stopping recording:', error)
+        toast.error('Failed to stop recording')
+        setIsRecording(false)
+      }
+    } else {
+      // Start recording
+      try {
+        mixer.startRecording()
+        setIsRecording(true)
+        toast.success('Recording started')
+      } catch (error) {
+        console.error('Error starting recording:', error)
+        toast.error('Failed to start recording')
+      }
+    }
+  }
 
-    // TODO: Implement actual recording
-    // For now, just create a placeholder post
+  async function handlePublish() {
+    if (!recordedBlob) return
+
+    setIsPublishing(true)
     try {
-      // This would be replaced with actual audio recording/upload
+      // Upload audio to Supabase Storage
+      toast.info('Uploading mix...')
+      const audioUrl = await uploadAudio(recordedBlob)
+
+      // Create post
       await createPost({
-        audio_url: '/loops/demo_loop.mp3', // placeholder
+        audio_url: audioUrl,
         bpm: Math.round((aBpm + bBpm) / 2),
-        style: 'DJ Mix',
+        style: caption || 'DJ Mix',
         key: 'Mixed'
       })
+
       toast.success('Mix published!')
+      setShowPublishModal(false)
+      setRecordedBlob(null)
+      setCaption('')
       setTimeout(() => nav('/stream'), 1000)
     } catch (error) {
+      console.error('Error publishing:', error)
       toast.error('Failed to publish. Please sign in first.')
     }
-    setIsRecording(false)
+    setIsPublishing(false)
+  }
+
+  function cancelPublish() {
+    setShowPublishModal(false)
+    setRecordedBlob(null)
+    setCaption('')
   }
 
   return (
@@ -185,32 +256,92 @@ export default function DJ() {
           </div>
         </div>
 
-        {/* Publish Button */}
+        {/* Record Button */}
         <div className="flex justify-center pt-6">
           <button
-            onClick={handlePublish}
-            disabled={isRecording || (!mixer.deckA.buffer && !mixer.deckB.buffer)}
-            className="group relative rounded-2xl bg-gradient-to-r from-red-500 via-orange-500 to-red-500 bg-size-200 hover:bg-pos-100 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-10 py-4 text-lg transition-all duration-300 shadow-xl hover:shadow-red-500/50 hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:hover:shadow-xl"
+            onClick={handleRecord}
+            disabled={!mixer.deckA.buffer && !mixer.deckB.buffer}
+            className={`group relative rounded-2xl ${
+              isRecording
+                ? 'bg-red-600 animate-pulse'
+                : 'bg-gradient-to-r from-red-500 via-orange-500 to-red-500'
+            } disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-10 py-4 text-lg transition-all duration-300 shadow-xl hover:shadow-red-500/50 hover:scale-105 active:scale-95 disabled:hover:scale-100`}
           >
             <span className="relative z-10 flex items-center gap-2">
               {isRecording ? (
                 <>
-                  <span className="animate-pulse">🎙️</span>
-                  <span>Recording...</span>
+                  <span className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                  <span>Stop Recording</span>
                 </>
               ) : (
                 <>
-                  <span>🎵</span>
-                  <span>Publish Mix</span>
+                  <span>🎙️</span>
+                  <span>Record Mix</span>
                 </>
               )}
             </span>
-            {!isRecording && (
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-red-600 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            )}
           </button>
         </div>
       </div>
+
+      {/* Publishing Modal */}
+      {showPublishModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-neutral-900 to-black border border-white/10 rounded-2xl p-8 max-w-lg w-full space-y-6 shadow-2xl">
+            <div className="text-center">
+              <div className="text-5xl mb-4">🎵</div>
+              <h2 className="text-2xl font-bold text-white mb-2">Publish Your Mix</h2>
+              <p className="text-white/60 text-sm">Share your creation with the community</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  Caption / Style
+                </label>
+                <input
+                  type="text"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="e.g., Deep House Mix, Tech Vibes..."
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20"
+                  disabled={isPublishing}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-white/60 text-xs mb-1">Avg BPM</div>
+                  <div className="text-white font-bold">{Math.round((aBpm + bBpm) / 2)}</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-white/60 text-xs mb-1">Duration</div>
+                  <div className="text-white font-bold">
+                    {recordedBlob ? `${(recordedBlob.size / 1024 / 1024).toFixed(1)} MB` : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cancelPublish}
+                disabled={isPublishing}
+                className="flex-1 rounded-xl border border-white/20 px-6 py-3 text-white font-semibold hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="flex-1 rounded-xl bg-white hover:bg-white/90 px-6 py-3 text-black font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+              >
+                {isPublishing ? 'Publishing...' : 'Publish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

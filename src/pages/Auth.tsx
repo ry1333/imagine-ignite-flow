@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { hasSupabase } from '../lib/env'
+import { getCurrentUserProfile } from '../lib/supabase/profiles'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'signIn'|'signUp'>('signIn')
-  const [email, setEmail] = useState('test@example.com')
-  const [password, setPassword] = useState('pass1234')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [search] = useSearchParams()
@@ -17,10 +18,49 @@ export default function AuthPage() {
     setError(null)
     setLoading(true)
     if (!hasSupabase || !supabase) { setError('Supabase not configured.'); setLoading(false); return }
-    const fn = mode === 'signIn' ? supabase.auth.signInWithPassword : supabase.auth.signUp
-    const { error } = await fn({ email, password })
-    if (error) setError(error.message)
-    else nav(search.get('next') || '/profile', { replace: true })
+
+    try {
+      if (mode === 'signUp') {
+        // Sign up with email confirmation disabled
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin + '/onboarding'
+          }
+        })
+
+        if (error) {
+          setError(error.message)
+        } else if (data.user) {
+          // Check if email confirmation is required
+          if (data.user.identities && data.user.identities.length === 0) {
+            setError('User already exists. Please sign in instead.')
+          } else {
+            // Redirect new users to onboarding
+            nav('/onboarding', { replace: true })
+          }
+        }
+      } else {
+        // Sign in
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          setError(error.message)
+        } else {
+          // Check if user has completed onboarding
+          const profile = await getCurrentUserProfile()
+          if (!profile || !profile.onboarding_completed) {
+            nav('/onboarding', { replace: true })
+          } else {
+            nav(search.get('next') || '/profile', { replace: true })
+          }
+        }
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error('Auth error:', err)
+    }
+
     setLoading(false)
   }
 

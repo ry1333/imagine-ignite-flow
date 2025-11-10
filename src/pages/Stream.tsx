@@ -70,7 +70,7 @@ export default function Stream() {
               </div>
             </div>
             <ActionRail
-              onRemix={() => nav(`/create?remix=${p.id}`)}
+              onRemix={() => nav(`/dj?remix=${p.id}`)}
               onLike={() => handleLike(p.id, loves, hasLoved)}
               loves={loves}
               hasLoved={hasLoved}

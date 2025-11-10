@@ -60,7 +60,7 @@ export default function Create() {
 
         {/* CTA Button */}
         <button
-          onClick={() => nav('/dj')}
+          onClick={() => nav(remix ? `/dj?remix=${remix}` : '/dj')}
           className="group w-full sm:w-auto rounded-2xl bg-white hover:bg-white/90 text-black font-bold px-12 py-4 text-lg transition-all hover:scale-[1.02] active:scale-95 inline-flex items-center justify-center gap-3"
         >
           <span>Open DJ Studio</span>

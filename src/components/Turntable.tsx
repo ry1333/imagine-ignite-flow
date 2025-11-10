@@ -13,8 +13,76 @@ export default function Turntable({ label, deck, progress, demo, color = 'cyan' 
   const [fileName, setFileName] = useState<string>('')
 
   async function loadDemo() { await deck.loadFromUrl(demo); setFileName('demo_loop.mp3') }
+
   async function loadFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return; await deck.loadFromFile(f); setFileName(f.name)
+    const f = e.target.files?.[0]
+    if (!f) return
+
+    // Check if it's a video file
+    if (f.type.startsWith('video/')) {
+      try {
+        // Extract audio from video
+        const audioBuffer = await extractAudioFromVideo(f, deck.ctx)
+        deck.buffer = audioBuffer
+        deck.stop(true) // reset position
+        setFileName(f.name + ' (audio extracted)')
+      } catch (error) {
+        console.error('Error extracting audio from video:', error)
+        alert('Failed to extract audio from video')
+      }
+    } else {
+      // Regular audio file
+      await deck.loadFromFile(f)
+      setFileName(f.name)
+    }
+  }
+
+  // Extract audio from video file using Web Audio API
+  async function extractAudioFromVideo(videoFile: File, audioContext: AudioContext): Promise<AudioBuffer> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      const canvas = document.createElement('canvas')
+      const ctx = audioContext.createMediaElementSource(video)
+      const dest = audioContext.createMediaStreamDestination()
+
+      ctx.connect(dest)
+
+      // Create MediaRecorder to capture audio
+      const chunks: Blob[] = []
+      const recorder = new MediaRecorder(dest.stream)
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        const arrayBuffer = await audioBlob.arrayBuffer()
+
+        try {
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0))
+          resolve(audioBuffer)
+        } catch (error) {
+          reject(error)
+        }
+      }
+
+      video.onloadedmetadata = () => {
+        recorder.start()
+        video.play()
+      }
+
+      video.onended = () => {
+        recorder.stop()
+      }
+
+      video.onerror = () => {
+        reject(new Error('Failed to load video'))
+      }
+
+      video.src = URL.createObjectURL(videoFile)
+      video.muted = false
+    })
   }
 
   // pitch control: -8%..+8%
@@ -150,7 +218,7 @@ export default function Turntable({ label, deck, progress, demo, color = 'cyan' 
         </button>
         <label className={`rounded-xl border ${t.cueBtn} px-4 py-2 font-semibold cursor-pointer transition-all hover:scale-105 active:scale-95`}>
           LOAD
-          <input type="file" accept="audio/*" onChange={loadFile} className="hidden"/>
+          <input type="file" accept="audio/*,video/*" onChange={loadFile} className="hidden"/>
         </label>
         <button
           onClick={loadDemo}
